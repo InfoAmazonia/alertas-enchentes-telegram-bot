@@ -1,6 +1,8 @@
 package org.telegram.updateshandlers;
 
 import org.telegram.BotConfig;
+import org.telegram.Commands;
+import org.telegram.CustomMessages;
 import org.telegram.telegrambots.TelegramApiException;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.Message;
@@ -15,32 +17,41 @@ public class AlertaEnchentesHandler extends	TelegramLongPollingBot {
 	}
 
 	@Override
+	public String getBotToken() {
+		return BotConfig.TOKENMYPROJECT;
+	}
+
+	@Override
 	public void onUpdateReceived(Update update) {
 		
-		 //check if the update has a message
         if(update.hasMessage()){
 	        Message message = update.getMessage();
 	
-	        //check if the message has text. it could also  contain for example a location ( message.hasLocation() )
-	        if(message.hasText()){
-
-                //create a object that contains the information to send back the message
+	        if (message != null && message.hasText()) {
                 SendMessage sendMessageRequest = new SendMessage();
-                sendMessageRequest.setChatId(message.getChatId().toString()); //who should get the message? the sender from which we got the message...
-                sendMessageRequest.setText(message.getText()+ " Estamos funcionando!");
+	        	String text = message.getText();
+	            String[] parts = text.split(" ", 2);
+	        		
+        		// Commands
+        		if (parts[0].startsWith(Commands.STATUSRIOBRANCO)) {
+        			sendMessageRequest.setChatId(message.getChatId().toString());
+	                sendMessageRequest.setText("Status para Rio Branco");
+        		} else if (parts[0].startsWith(Commands.STATUSPORTOVELHO)) {
+        			sendMessageRequest.setChatId(message.getChatId().toString());
+	                sendMessageRequest.setText("Status para Porto Velho");
+        		} else {
+	                sendMessageRequest.setChatId(message.getChatId().toString());
+	                sendMessageRequest.setText(CustomMessages.help);
+        		}
+	            
                 try {
-                        sendMessage(sendMessageRequest); //at the end, so some magic and send the message ;)
+                    sendMessage(sendMessageRequest);
                 } catch (TelegramApiException e) {
-                        //do some error handling
+                	
                 }
 	        }
         }
 		
-	}
-
-	@Override
-	public String getBotToken() {
-		return BotConfig.TOKENMYPROJECT;
 	}
 
 }
