@@ -9,6 +9,9 @@ import org.telegram.telegrambots.api.objects.Message;
 import org.telegram.telegrambots.api.objects.Update;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 
+/**
+ * @author Jefferson Neves <jefferson.rpn@gmail.com>
+ */
 public class AlertaEnchentesHandler extends	TelegramLongPollingBot {
 
 	@Override

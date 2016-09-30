@@ -1,10 +1,7 @@
 package org.telegram;
 
 /**
- * @author Ruben Bermudez
- * @version 1.0
- * @brief Command for the bots
- * @date 20 of June of 2015
+ * @author Jefferson Neves <jefferson.rpn@gmail.com>
  */
 public class Commands {
     public static final String commandInitChar = "/";

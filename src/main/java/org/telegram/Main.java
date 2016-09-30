@@ -6,10 +6,7 @@ import org.telegram.telegrambots.logging.BotLogger;
 import org.telegram.updateshandlers.*;
 
 /**
- * @author Ruben Bermudez
- * @version 1.0
- * @brief Main class to create all bots
- * @date 20 of June of 2015
+ * @author Jefferson Neves <jefferson.rpn@gmail.com>
  */
 public class Main {
     public static void main(String[] args) {
