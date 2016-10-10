@@ -1,4 +1,4 @@
-package org.telegram;
+package br.edu.ufcg.analytics.infoamazonia;
 
 /**
  * @author Jefferson Neves <jefferson.rpn@gmail.com>
