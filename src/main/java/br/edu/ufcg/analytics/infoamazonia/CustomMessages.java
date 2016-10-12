@@ -2,7 +2,6 @@ package br.edu.ufcg.analytics.infoamazonia;
 
 import java.util.List;
 
-import br.edu.ufcg.analytics.infoamazonia.database.DatabaseManager;
 import br.edu.ufcg.analytics.infoamazonia.services.Emoji;
 import br.edu.ufcg.analytics.infoamazonia.services.LocalisationService;
 
@@ -22,18 +21,17 @@ public class CustomMessages {
                 Emoji.ALARM_CLOCK.toString());
     }
     
-    public static String getAlertListMessage(int userId, String language) {
+    public static String getAlertListMessage(List<String> alertNames, String language) {
         String alertListMessage;
 
-        List<String> alertCities = DatabaseManager.getInstance().getAlertNamesByUser(userId);
-        if (alertCities.size() > 0) {
+        if (alertNames.size() > 0) {
             String baseAlertListString = LocalisationService.getInstance().getString("initialAlertList", language);
             String partialAlertListString = LocalisationService.getInstance().getString("partialAlertList", language);
             String fullListOfAlerts = "";
-            for (String alertCity : alertCities) {
+            for (String alertCity : alertNames) {
                 fullListOfAlerts += String.format(partialAlertListString, Emoji.ALARM_CLOCK.toString(), alertCity);
             }
-            alertListMessage = String.format(baseAlertListString, alertCities.size(), fullListOfAlerts);
+            alertListMessage = String.format(baseAlertListString, alertNames.size(), fullListOfAlerts);
         } else {
             alertListMessage = LocalisationService.getInstance().getString("noAlertList", language);
         }

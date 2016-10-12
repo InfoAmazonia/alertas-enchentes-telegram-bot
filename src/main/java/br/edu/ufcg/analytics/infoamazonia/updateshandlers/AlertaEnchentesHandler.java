@@ -1,11 +1,31 @@
 package br.edu.ufcg.analytics.infoamazonia.updateshandlers;
 
-import static br.edu.ufcg.analytics.infoamazonia.Commands.*;
-import static br.edu.ufcg.analytics.infoamazonia.CustomMessages.*;
+import static br.edu.ufcg.analytics.infoamazonia.Commands.getAlertCommand;
+import static br.edu.ufcg.analytics.infoamazonia.Commands.getBackCommand;
+import static br.edu.ufcg.analytics.infoamazonia.Commands.getCancelCommand;
+import static br.edu.ufcg.analytics.infoamazonia.Commands.getDeleteCommand;
+import static br.edu.ufcg.analytics.infoamazonia.Commands.getListCommand;
+import static br.edu.ufcg.analytics.infoamazonia.Commands.getNewCommand;
+import static br.edu.ufcg.analytics.infoamazonia.Commands.getRioBrancoCommand;
+import static br.edu.ufcg.analytics.infoamazonia.Commands.getRioMadeiraCommand;
+import static br.edu.ufcg.analytics.infoamazonia.Commands.getStatusCommand;
+import static br.edu.ufcg.analytics.infoamazonia.CustomMessages.getAlertListMessage;
+import static br.edu.ufcg.analytics.infoamazonia.CustomMessages.getChooseNewAlertSetMessage;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
 
+import org.apache.http.HttpStatus;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.Message;
 import org.telegram.telegrambots.api.objects.Update;
@@ -22,7 +42,11 @@ import br.edu.ufcg.analytics.infoamazonia.Commands;
 import br.edu.ufcg.analytics.infoamazonia.CustomMessages;
 import br.edu.ufcg.analytics.infoamazonia.River;
 import br.edu.ufcg.analytics.infoamazonia.State;
-import br.edu.ufcg.analytics.infoamazonia.database.DatabaseManager;
+import br.edu.ufcg.analytics.infoamazonia.database.AlertRepository;
+import br.edu.ufcg.analytics.infoamazonia.database.ConversationRepository;
+import br.edu.ufcg.analytics.infoamazonia.model.Alert;
+import br.edu.ufcg.analytics.infoamazonia.model.Conversation;
+import br.edu.ufcg.analytics.infoamazonia.model.RiverStatus;
 import br.edu.ufcg.analytics.infoamazonia.services.Emoji;
 import br.edu.ufcg.analytics.infoamazonia.services.LocalisationService;
 
@@ -33,6 +57,21 @@ import br.edu.ufcg.analytics.infoamazonia.services.LocalisationService;
 public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 
 	private static final String LOGTAG = "ALERTAHANDLERS";
+
+	private AlertRepository alertRepo;
+	private ConversationRepository conversationRepo;
+	private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1); ///< Thread to execute operations
+
+	private RiverStatus status;
+	
+
+	public AlertaEnchentesHandler(AlertRepository alertRepo, ConversationRepository conversationRepo) {
+		super();
+		this.alertRepo = alertRepo;
+		this.conversationRepo = conversationRepo;
+		this.status = RiverStatus.INDISPONIVEL;
+//        startAlertTimers();
+	}
 
 	public String getBotUsername() {
 		return BotConfig.USERNAMEMYPROJECT;
@@ -59,7 +98,7 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 
 	private void handleIncomingMessage(Message message) throws TelegramApiException {
 
-		State menu = DatabaseManager.getInstance().getState(message.getFrom().getId(), message.getChatId());
+		State menu = getConversationState(message.getFrom().getId(), message.getChatId());
 		final String language = "pt-BR";// DatabaseManager.getInstance().getUserWeatherOptions(message.getFrom().getId())[0];
 		if (!message.isUserMessage() && message.hasText()) {
 			if (isCommandForOther(message.getText())) {
@@ -98,20 +137,20 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 		sendMessage(sendMessageRequest);
 	}
 
-	private static boolean isCommandForOther(String text) {
+	private boolean isCommandForOther(String text) {
 		boolean isSimpleCommand = text.equals("/start") || text.equals("/help") || text.equals("/stop");
 		boolean isCommandForMe = text.equals("/start@weatherbot") || text.equals("/help@weatherbot")
 				|| text.equals("/stop@weatherbot");
 		return text.startsWith("/") && !isSimpleCommand && !isCommandForMe;
 	}
 
-	private static SendMessage processDefaultStartOption(Message message, String language) {
+	private SendMessage processDefaultStartOption(Message message, String language) {
 		ReplyKeyboardMarkup replyKeyboardMarkup = getMainMenuKeyboard(language);
-		DatabaseManager.getInstance().setState(message.getFrom().getId(), message.getChatId(), State.MAIN_MENU);
+		setConversationState(message.getFrom().getId(), message.getChatId(), State.MAIN_MENU);
 		return buildSendMessage(message, replyKeyboardMarkup, CustomMessages.getHelpMessage(language));
 	}
 	
-	private static SendMessage buildSendMessage(Message message, ReplyKeyboard replyKeyboard, String text) {
+	private SendMessage buildSendMessage(Message message, ReplyKeyboard replyKeyboard, String text) {
 		SendMessage sendMessage = new SendMessage();
 		sendMessage.enableMarkdown(true);
 		sendMessage.setChatId(message.getChatId().toString());
@@ -124,17 +163,17 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 	}
 
 
-	private static SendMessage processMainMenuOption(Message message, String language) {
+	private SendMessage processMainMenuOption(Message message, String language) {
 		if (message.hasText()) {
 			String text = message.getText();
 			
 			if (getStatusCommand(language).equals(text)) {
-				DatabaseManager.getInstance().setState(message.getFrom().getId(), message.getChatId(), State.STATUS);
+				setConversationState(message.getFrom().getId(), message.getChatId(), State.STATUS);
 				return buildSendMessage(message, getRiversKeyboard(language), LocalisationService.getInstance().getString("onCurrentCommandFromHistory", language));
 			} 
 			
 			if (getAlertCommand(language).equals(text)) {
-				DatabaseManager.getInstance().setState(message.getFrom().getId(), message.getChatId(), State.ALERT);
+				setConversationState(message.getFrom().getId(), message.getChatId(), State.ALERT);
 				return buildSendMessage(message, getAlertsKeyboard(language), LocalisationService.getInstance().getString("alertsMenuMessage", language));
 			}
 		}
@@ -143,7 +182,7 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 	}
 
 	private SendMessage processStatusMenuOption(Message message, String language, State state) {
-		DatabaseManager.getInstance().setState(message.getFrom().getId(), message.getChatId(), State.MAIN_MENU);
+		setConversationState(message.getFrom().getId(), message.getChatId(), State.MAIN_MENU);
 
 		if (message.hasText()) {
 			String text = message.getText();
@@ -153,19 +192,19 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 					return buildSendMessage(message, getMainMenuKeyboard(language), LocalisationService.getInstance().getString("invalidRiverBackToMainMenu", language));
 				}
 				
-				return buildSendMessage(message, getMainMenuKeyboard(language), DatabaseManager.getInstance().getLastStatus(river.getCode(),
-						message.getFrom().getId(), language));
+				return buildSendMessage(message, getMainMenuKeyboard(language), getRiverStatusMessage(river.getCode(),
+						language));
 			}
 		}
 		
 		return buildSendMessage(message, getMainMenuKeyboard(language), LocalisationService.getInstance().getString("backToMainMenu", language));
 	}
 
-	private static SendMessage processAlertMenuOption(Message message, String language) {
+	private SendMessage processAlertMenuOption(Message message, String language) {
 		if (message.hasText()) {
 			if (message.getText().equals(getNewCommand(language))) {
 				String text = LocalisationService.getInstance().getString("chooseNewAlertCity", language);
-				DatabaseManager.getInstance().setState(message.getFrom().getId(), message.getChatId(), State.ALERT_NEW);
+				setConversationState(message.getFrom().getId(), message.getChatId(), State.ALERT_NEW);
 				return buildSendMessage(message, getRiversKeyboard(language), text);
 			} else if (message.getText().equals(getDeleteCommand(language))) {
 
@@ -173,7 +212,7 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 		        ReplyKeyboard replyKeyboard = getAlertsListKeyboard(message.getFrom().getId(), language);
 		        if (replyKeyboard != null) {
 		            text = LocalisationService.getInstance().getString("chooseDeleteAlertCity", language);
-		            DatabaseManager.getInstance().setState(message.getFrom().getId(), message.getChatId(), State.ALERT_DELETE);
+		            setConversationState(message.getFrom().getId(), message.getChatId(), State.ALERT_DELETE);
 		        } else {
 		            replyKeyboard = getAlertsKeyboard(language);
 		            text = LocalisationService.getInstance().getString("noAlertList", language);
@@ -181,20 +220,21 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 
 				return buildSendMessage(message, replyKeyboard, text);
 			} else if (message.getText().equals(getListCommand(language))) {
-				return buildSendMessage(message, getAlertsKeyboard(language), getAlertListMessage(message.getFrom().getId(), language));
+				List<String> alertNames = getAlertNamesByUser(message.getFrom().getId());
+				return buildSendMessage(message, getAlertsKeyboard(language), getAlertListMessage(alertNames, language));
 			} else if (message.getText().equals(getBackCommand(language))) {
-				DatabaseManager.getInstance().setState(message.getFrom().getId(), message.getChatId(), State.MAIN_MENU);
+				setConversationState(message.getFrom().getId(), message.getChatId(), State.MAIN_MENU);
 				return buildSendMessage(message, getMainMenuKeyboard(language), LocalisationService.getInstance().getString("backToMainMenu", language));
 			} else {
 				return buildSendMessage(message, getAlertsKeyboard(language), LocalisationService.getInstance().getString("chooseOption", language));
 			}
 		}
-		DatabaseManager.getInstance().setState(message.getFrom().getId(), message.getChatId(), State.MAIN_MENU);
+		setConversationState(message.getFrom().getId(), message.getChatId(), State.MAIN_MENU);
 		return buildSendMessage(message, getMainMenuKeyboard(language), LocalisationService.getInstance().getString("backToMainMenu", language));
 	}
 
 	
-    private static SendMessage processNewAlertMenuOption(Message message, String language) {
+    private SendMessage processNewAlertMenuOption(Message message, String language) {
         if (message.hasText()) {
             if (!message.getText().equals(getCancelCommand(language))) {
                 int userId = message.getFrom().getId();
@@ -204,29 +244,26 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
                 	return buildSendMessage(message, getRiversKeyboard(language), LocalisationService.getInstance().getString("chooseOption", language));
                 }
                 
-                DatabaseManager.getInstance().setState(userId, message.getChatId(), State.ALERT);
-                DatabaseManager.getInstance().createNewAlert(userId, river);
+                setConversationState(userId, message.getChatId(), State.ALERT);
+                createNewAlert(userId, river);
                 return buildSendMessage(message, getAlertsKeyboard(language), getChooseNewAlertSetMessage(message.getText(), language));
             } 
         }
-        DatabaseManager.getInstance().setState(message.getFrom().getId(), message.getChatId(), State.ALERT);
+        setConversationState(message.getFrom().getId(), message.getChatId(), State.ALERT);
         return buildSendMessage(message, getAlertsKeyboard(language), LocalisationService.getInstance().getString("alertsMenuMessage", language));
     }
     
-    private static SendMessage processDeleteAlertMenuOption(Message message, String language) {
+	private SendMessage processDeleteAlertMenuOption(Message message, String language) {
         if (message.hasText()) {
             if (message.getText().equals(getCancelCommand(language))) {
-                DatabaseManager.getInstance().setState(message.getFrom().getId(), message.getChatId(), State.ALERT);
+                setConversationState(message.getFrom().getId(), message.getChatId(), State.ALERT);
                 return buildSendMessage(message, getAlertsKeyboard(language), LocalisationService.getInstance().getString("alertsMenuMessage", language));
             }
             
             River river = River.fromName(message.getText());
-            if(river != null){
-            	if (DatabaseManager.getInstance().getAlertNamesByUser(message.getFrom().getId()).contains(message.getText())) {
-            		DatabaseManager.getInstance().deleteAlert(message.getFrom().getId(), river);
-            		DatabaseManager.getInstance().setState(message.getFrom().getId(), message.getChatId(), State.ALERT);
-            		return buildSendMessage(message, getAlertsKeyboard(language), LocalisationService.getInstance().getString("alertDeleted", language));
-            	}
+            if(river != null && deleteAlert(message.getFrom().getId(), river)){
+            	setConversationState(message.getFrom().getId(), message.getChatId(), State.ALERT);
+            	return buildSendMessage(message, getAlertsKeyboard(language), LocalisationService.getInstance().getString("alertDeleted", language));
             }
         }
 
@@ -235,7 +272,7 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 
 
 
-    private static ReplyKeyboardMarkup buildKeyboard(List<KeyboardRow> keyboard) {
+    private ReplyKeyboardMarkup buildKeyboard(List<KeyboardRow> keyboard) {
     	ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
     	replyKeyboardMarkup.setSelective(true);
     	replyKeyboardMarkup.setResizeKeyboard(true);
@@ -244,7 +281,7 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
     	return replyKeyboardMarkup;
     }
 	
-    private static KeyboardRow buildKeyboardRow(String... commands) {
+    private KeyboardRow buildKeyboardRow(String... commands) {
     	KeyboardRow row = new KeyboardRow();
     	for (String command : commands) {
     		row.add(command);
@@ -252,14 +289,14 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
     	return row;
     }
         
-	private static ReplyKeyboardMarkup getMainMenuKeyboard(String language) {
+	private ReplyKeyboardMarkup getMainMenuKeyboard(String language) {
 
 		List<KeyboardRow> keyboard = new ArrayList<>();
 		keyboard.add(buildKeyboardRow(getStatusCommand(language), getAlertCommand(language)));
 		return buildKeyboard(keyboard);
 	}
 	
-	private static ReplyKeyboardMarkup getRiversKeyboard(String language) {
+	private ReplyKeyboardMarkup getRiversKeyboard(String language) {
 
 		List<KeyboardRow> keyboard = new ArrayList<>();
 		keyboard.add(buildKeyboardRow(getRioBrancoCommand(language)));
@@ -269,7 +306,7 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 		return buildKeyboard(keyboard);
 	}
 
-	private static ReplyKeyboardMarkup getAlertsKeyboard(String language) {
+	private ReplyKeyboardMarkup getAlertsKeyboard(String language) {
 
 		List<KeyboardRow> keyboard = new ArrayList<>();
 		keyboard.add(buildKeyboardRow(getNewCommand(language), getDeleteCommand(language)));
@@ -278,9 +315,9 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 		return buildKeyboard(keyboard);
 	}
 
-	private static ReplyKeyboardMarkup getAlertsListKeyboard(Integer userId, String language) {
+	private ReplyKeyboardMarkup getAlertsListKeyboard(Integer userId, String language) {
 
-		List<String> alertNames = DatabaseManager.getInstance().getAlertNamesByUser(userId);
+		List<String> alertNames = getAlertNamesByUser(userId);
 
 		if(alertNames.isEmpty()){
 			return null;
@@ -296,4 +333,70 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
     }
 
 	
+	private void setConversationState(Integer userId, Long chatId, State state) {
+		Conversation conversation = conversationRepo.findFirstByUserIdAndChatId(userId, chatId);
+		conversation.state = state;
+		conversationRepo.save(conversation);
+	}
+
+	private State getConversationState(Integer userId, Long chatId) {
+		Conversation conversation = conversationRepo.findFirstByUserIdAndChatId(userId, chatId);
+		return conversation == null? State.START: conversation.state;
+	}
+
+    private void createNewAlert(int userId, River river) {
+		alertRepo.save(new Alert(userId, river));
+	}
+
+	public boolean deleteAlert(Integer userId, River river) {
+		Alert alert = alertRepo.findFirstByUserIdAndRiver(userId, river);
+		if(alert == null){
+			return false;
+		}
+		alertRepo.delete(alert);
+		return true;
+	}
+	
+	public List<String> getAlertNamesByUser(Integer userId) {
+		return alertRepo.findAllByUserId(userId).stream().map(alert -> alert.river.getName()).collect(Collectors.toList());
+	}
+
+	private String getRiverStatusMessage(Long riverId, String language) {
+		
+		return "Status do " + River.fromCode(riverId);
+	}
+
+//	private void startAlertTimers() {
+//		for (River river : River.values()) {
+//			executorService.scheduleAtFixedRate(() -> updateStatus(river.getCode()), 10, 60, TimeUnit.SECONDS);
+//		}
+//	}
+//
+//	private void updateStatus(Long riverCode) {
+//		RiverStatus status = this.status;
+//		RiverStatus updatedStatus = collectRiverStatus(riverCode); 
+//		if(updatedStatus != null){
+//			
+//		}
+//	}
+//
+//	private RiverStatus collectRiverStatus(Long riverCode) {
+//		HttpGet request = new HttpGet("http://enchentes.infoamazonia.org:8080/station/" + riverCode + "/prediction");
+//		try{
+//			CloseableHttpClient httpclient = HttpClients.createDefault();
+//			CloseableHttpResponse response = httpclient.execute(request);
+//			if(response.getStatusLine().getStatusCode() == HttpStatus.SC_OK){
+//				JSONObject object = new JSONObject(response.getEntity().getContent());
+//				JSONArray jsonArray = object.getJSONArray("data");
+//				RiverStatus measuredStatus = RiverStatus.valueOf(jsonArray.getJSONObject(0).getString("measuredStatus"));
+////				Json.from
+//				for (int i = 0; i < jsonArray.length(); i++) {
+//					return RiverStatus.valueOf(jsonArray.getJSONObject(i).getString("measuredStatus"));
+//				}
+//			}
+//		}catch(IOException e){
+//			//LOG EXCEPTION
+//		}
+//		return null;
+//	}
 }
