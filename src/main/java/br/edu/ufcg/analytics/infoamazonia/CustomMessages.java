@@ -10,8 +10,8 @@ import br.edu.ufcg.analytics.infoamazonia.services.LocalisationService;
  */
 public class CustomMessages {
     public static final String help = "Alerta de enchentes\n\nVeja as previsões de volume para os rios da região amazônica. Para qual rio?\n\n" +
-            Commands.STATUSRIOBRANCO + " para previsões do Rio Branco.\n" +
-            Commands.STATUSPORTOVELHO + " para previsões de Porto Velho.\n" +
+            Commands.STATUSRIOACRE + " para previsões do Rio Acre.\n" +
+            Commands.STATUSRIOMADEIRA + " para previsões de Rio Madeira.\n" +
             Commands.HELP + " para obter ajuda.";
     
     

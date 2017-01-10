@@ -13,7 +13,11 @@ import static br.edu.ufcg.analytics.infoamazonia.CustomMessages.getAlertListMess
 import static br.edu.ufcg.analytics.infoamazonia.CustomMessages.getChooseNewAlertSetMessage;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -24,8 +28,9 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.JSONTokener;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.Message;
 import org.telegram.telegrambots.api.objects.Update;
@@ -335,6 +340,9 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 	
 	private void setConversationState(Integer userId, Long chatId, State state) {
 		Conversation conversation = conversationRepo.findFirstByUserIdAndChatId(userId, chatId);
+		if(conversation == null){
+			conversation = new Conversation(userId, chatId, null);
+		}
 		conversation.state = state;
 		conversationRepo.save(conversation);
 	}
@@ -362,8 +370,42 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 	}
 
 	private String getRiverStatusMessage(Long riverId, String language) {
+		String uriString = "http://enchentes.infoamazonia.org:8080/station/" + riverId + "/now";
+//		HttpGet request = new HttpGet(uriString);
 		
-		return "Status do " + River.fromCode(riverId);
+		try {
+			URI uri = new URI(uriString);
+			JSONTokener tokener = new JSONTokener(uri.toURL().openStream());
+			JSONObject root = new JSONObject(tokener);
+			return root.getString("message");
+		} catch (URISyntaxException | JSONException | IOException e) {
+			BotLogger.error(LOGTAG, e);
+		}
+		return "Opção indisponível no momento. Tente novamente em alguns minutos!";
+
+
+//		try(
+//				CloseableHttpClient httpclient = HttpClients.createDefault();
+//				CloseableHttpResponse response = httpclient.execute(request);
+//				){
+//			if(response.getStatusLine().getStatusCode() == HttpStatus.SC_OK){
+//				JSONTokener tokener = new JSONTokener(response.getEntity().getContent());
+//				System.out.println(tokener.nextValue());
+//				JSONObject object = new JSONObject(response.getEntity().getContent());
+//				System.out.println(object);
+//				Iterator keys = object.keys();
+//				while (keys.hasNext()) {
+//					System.out.println(keys.next());
+//					
+//				}
+//				return object.getString("message");
+//			}else{
+//				System.out.println(riverId  + "" + response.getStatusLine().getStatusCode());
+//			}
+//		}catch(IOException e){
+//			BotLogger.error(LOGTAG, e);
+//		}
+//		return "Opção indisponível no momento. Tente novamente em alguns minutos!";
 	}
 
 //	private void startAlertTimers() {
