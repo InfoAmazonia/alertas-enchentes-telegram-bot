@@ -73,9 +73,24 @@ public class Commands {
                 Emoji.CLIPBOARD.toString());
     }
 
+    public static String getDemoCommand(String language) {
+        return String.format(LocalisationService.getInstance().getString("demo", language),
+                Emoji.SPARKLE.toString());
+    }
+
     public static String getBackCommand(String language) {
         return String.format(LocalisationService.getInstance().getString("back", language),
                 Emoji.BACK_WITH_LEFTWARDS_ARROW_ABOVE.toString());
+    }
+
+    public static String getStopCommand(String language) {
+        return String.format(LocalisationService.getInstance().getString("stop", language),
+                Emoji.BACK_WITH_LEFTWARDS_ARROW_ABOVE.toString());
+    }
+
+    public static String getNextCommand(String language) {
+        return String.format(LocalisationService.getInstance().getString("next", language),
+                Emoji.BLACK_RIGHTWARDS_ARROW.toString());
     }
 
 
