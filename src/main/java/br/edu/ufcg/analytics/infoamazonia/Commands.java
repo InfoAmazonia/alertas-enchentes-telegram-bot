@@ -85,7 +85,7 @@ public class Commands {
 
     public static String getStopCommand(String language) {
         return String.format(LocalisationService.getInstance().getString("stop", language),
-                Emoji.BACK_WITH_LEFTWARDS_ARROW_ABOVE.toString());
+                Emoji.CROSS_MARK.toString());
     }
 
     public static String getNextCommand(String language) {
