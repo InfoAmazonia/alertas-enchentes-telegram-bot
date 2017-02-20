@@ -15,12 +15,18 @@ import static br.edu.ufcg.analytics.infoamazonia.Commands.getStopCommand;
 import static br.edu.ufcg.analytics.infoamazonia.CustomMessages.getAlertListMessage;
 import static br.edu.ufcg.analytics.infoamazonia.CustomMessages.getChooseNewAlertSetMessage;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.Message;
 import org.telegram.telegrambots.api.objects.Update;
@@ -394,6 +400,9 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 	
 	private void setConversationState(Integer userId, Long chatId, State state) {
 		Conversation conversation = conversationRepo.findFirstByUserIdAndChatId(userId, chatId);
+		if(conversation == null){
+			conversation = new Conversation(userId, chatId, null);
+		}
 		conversation.state = state;
 		conversationRepo.save(conversation);
 	}
@@ -438,8 +447,17 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 	}
 
 	private String getRiverStatusMessage(Long riverId, String language) {
+		String uriString = "http://enchentes.infoamazonia.org:8080/station/" + riverId + "/now";
 		
-		return "Status do " + River.fromCode(riverId);
+		try {
+			URI uri = new URI(uriString);
+			JSONTokener tokener = new JSONTokener(uri.toURL().openStream());
+			JSONObject root = new JSONObject(tokener);
+			return root.getString("message");
+		} catch (URISyntaxException | JSONException | IOException e) {
+			BotLogger.error(LOGTAG, e);
+		}
+		return "Opção indisponível no momento. Tente novamente em alguns minutos!";
 	}
 
 	private String getStartDemoMessage(Long riverId, String language) {

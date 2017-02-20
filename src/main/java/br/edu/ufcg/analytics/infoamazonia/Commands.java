@@ -10,14 +10,14 @@ public class Commands {
     public static final String commandInitChar = "/";
     public static final String START = commandInitChar + "iniciar";
     public static final String HELP = commandInitChar + "ajuda";
-    public static final String STATUSRIOBRANCO = commandInitChar + "riobranco";
-    public static final String STATUSPORTOVELHO = commandInitChar + "portovelho";
+    public static final String STATUSRIOACRE = commandInitChar + "rioacre";
+    public static final String STATUSRIOMADEIRA = commandInitChar + "riomadeira";
     
     public static final String STOPCOMMAND = commandInitChar + "stop";
 
     public enum AlertaEnchentesCommands{
     	STATUS("status", Emoji.CHART_WITH_UPWARDS_TREND),
-    	STATUS_RIO_BRANCO("status_rio_branco", null)
+    	STATUS_RIO_ACRE("status_rio_acre", null)
     	;
     	
     	private final String command;
@@ -40,7 +40,7 @@ public class Commands {
     }
 
     public static String getRioBrancoCommand(String language) {
-        return AlertaEnchentesCommands.STATUS_RIO_BRANCO.getCommand(language);
+        return AlertaEnchentesCommands.STATUS_RIO_ACRE.getCommand(language);
     }
 
     public static String getRioMadeiraCommand(String language) {
