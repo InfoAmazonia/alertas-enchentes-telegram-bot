@@ -1,7 +1,7 @@
 package br.edu.ufcg.analytics.infoamazonia;
 
 public enum River {
-	RIO_BRANCO(13600002L, "Rio Acre"), RIO_MADEIRA(15400000L, "Rio Madeira");
+	RIO_BRANCO(13600010L, "Rio Acre"), RIO_MADEIRA(15400000L, "Rio Madeira");
 
 	private final Long code;
 	private final String name;
