@@ -18,10 +18,17 @@ import static br.edu.ufcg.analytics.infoamazonia.CustomMessages.getChooseNewAler
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.json.JSONException;
@@ -48,8 +55,8 @@ import br.edu.ufcg.analytics.infoamazonia.database.AlertRepository;
 import br.edu.ufcg.analytics.infoamazonia.database.ConversationRepository;
 import br.edu.ufcg.analytics.infoamazonia.model.Alert;
 import br.edu.ufcg.analytics.infoamazonia.model.AlertDemo;
+import br.edu.ufcg.analytics.infoamazonia.model.AlertMessage;
 import br.edu.ufcg.analytics.infoamazonia.model.Conversation;
-import br.edu.ufcg.analytics.infoamazonia.model.RiverStatus;
 import br.edu.ufcg.analytics.infoamazonia.services.Emoji;
 import br.edu.ufcg.analytics.infoamazonia.services.LocalisationService;
 
@@ -66,7 +73,12 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 	private ConversationRepository conversationRepo;
 	private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1); ///< Thread to execute operations
 
-	private RiverStatus status;
+	private DateTimeFormatter dayFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy").withZone(ZoneId.systemDefault());
+	private DateTimeFormatter hourFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault());
+	
+	Map<Long,AlertMessage> alerts;
+
+	private String defaultLanguage;
 	
 
 	public AlertaEnchentesHandler(AlertRepository alertRepo, ConversationRepository conversationRepo, AlertDemoRepository alertDemoRepo) {
@@ -74,8 +86,8 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 		this.alertRepo = alertRepo;
 		this.conversationRepo = conversationRepo;
 		this.alertDemoRepo = alertDemoRepo;
-		this.status = RiverStatus.INDISPONIVEL;
-//        startAlertTimers();
+		this.alerts = new HashMap<>();
+        startAlertTimers();
 	}
 
 	public String getBotUsername() {
@@ -104,7 +116,8 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 	private void handleIncomingMessage(Message message) throws TelegramApiException {
 
 		State menu = getConversationState(message.getFrom().getId(), message.getChatId());
-		final String language = "pt-BR";// DatabaseManager.getInstance().getUserWeatherOptions(message.getFrom().getId())[0];
+		defaultLanguage = "pt-BR";
+		// DatabaseManager.getInstance().getUserWeatherOptions(message.getFrom().getId())[0];
 		if (!message.isUserMessage() && message.hasText()) {
 			if (isCommandForOther(message.getText())) {
 				return;
@@ -119,28 +132,28 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 		SendMessage sendMessageRequest;
 		switch (menu) {
 		case MAIN_MENU:
-			sendMessageRequest = processMainMenuOption(message, language);
+			sendMessageRequest = processMainMenuOption(message, defaultLanguage);
 			break;
 		case STATUS:
-			sendMessageRequest = processStatusMenuOption(message, language, menu);
+			sendMessageRequest = processStatusMenuOption(message, defaultLanguage, menu);
 			break;
 		case ALERT:
-			sendMessageRequest = processAlertMenuOption(message, language);
+			sendMessageRequest = processAlertMenuOption(message, defaultLanguage);
 			break;
 		case ALERT_NEW:
-			sendMessageRequest = processNewAlertMenuOption(message, language);
+			sendMessageRequest = processNewAlertMenuOption(message, defaultLanguage);
 			break;
 		case ALERT_DEMO:
-			sendMessageRequest = processNewAlertDemoMenuOption(message, language);
+			sendMessageRequest = processNewAlertDemoMenuOption(message, defaultLanguage);
 			break;
 		case ALERT_DEMO_STARTED:
-			sendMessageRequest = processAlertDemoMenuOption(message, language);
+			sendMessageRequest = processAlertDemoMenuOption(message, defaultLanguage);
 			break;
 		case ALERT_DELETE:
-			sendMessageRequest = processDeleteAlertMenuOption(message, language);
+			sendMessageRequest = processDeleteAlertMenuOption(message, defaultLanguage);
 			break;
 		default:
-			sendMessageRequest = processDefaultStartOption(message, language);
+			sendMessageRequest = processDefaultStartOption(message, defaultLanguage);
 			break;
 		}
 		System.out.println("AlertaEnchentesHandler.handleIncomingMessage()");
@@ -166,6 +179,17 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 		sendMessage.enableMarkdown(true);
 		sendMessage.setChatId(message.getChatId().toString());
 		sendMessage.setReplyToMessageId(message.getMessageId());
+		if (replyKeyboard != null) {
+			sendMessage.setReplyMarkup(replyKeyboard);
+		}
+		sendMessage.setText(text);
+		return sendMessage;
+	}
+
+	private SendMessage buildSendMessage(String chatID, ReplyKeyboard replyKeyboard, String text) {
+		SendMessage sendMessage = new SendMessage();
+		sendMessage.enableMarkdown(true);
+		sendMessage.setChatId(chatID);
 		if (replyKeyboard != null) {
 			sendMessage.setReplyMarkup(replyKeyboard);
 		}
@@ -260,7 +284,7 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
                 }
                 
                 setConversationState(userId, message.getChatId(), State.ALERT);
-                createNewAlert(userId, river);
+                createNewAlert(message.getChatId(), river);
                 return buildSendMessage(message, getAlertsKeyboard(language), getChooseNewAlertSetMessage(message.getText(), language));
             } 
         }
@@ -403,8 +427,8 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 		return conversation == null? State.START: conversation.state;
 	}
 
-    private void createNewAlert(int userId, River river) {
-		alertRepo.save(new Alert(userId, river));
+    private void createNewAlert(Long chatID, River river) {
+		alertRepo.save(new Alert(chatID, river));
 	}
 
     private void updateAlertDemo(int userId, River river, Long timestamp) {
@@ -423,7 +447,7 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
     private String getNextAlertDemo(int userId) {
     	AlertDemo alert = alertDemoRepo.findOne(userId);
     	
-		String uriString = "https://enchentes.infoamazonia.org:8080/station/" + alert.river + "/alert?timestamp=" + alert.timestamp;
+		String uriString = "https://enchentes.infoamazonia.org:8080/station/" + alert.river.getCode() + "/alert?timestamp=" + alert.timestamp;
 		
 		try {
 			URI uri = new URI(uriString);
@@ -433,7 +457,9 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 			alert.timestamp = root.getLong("timestamp");
 			alertDemoRepo.save(alert);
 			
-			return root.getString("message");
+			LocalDateTime dateTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(alert.timestamp), ZoneId.systemDefault());
+			
+			return "Em " + dateTime.format(dayFormatter) + " às " + dateTime.format(hourFormatter) + ", os cidadão receberiam o seguinte alerta:\n\n\n" + root.getString("message");
 		} catch (URISyntaxException | JSONException | IOException e) {
 			BotLogger.error(LOGTAG, e);
 		}
@@ -471,4 +497,48 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 		
 		return "A seguir, mostraremos os alertas gerados para o " + River.fromCode(riverId) + " no ano de 2016. Escolha \"Próximo\" para ver mais um alerta ou \"Encerrar\" para terminar a demonstração.";
 	}
+
+	private void startAlertTimers() {
+		for (River river : River.values()) {
+			executorService.scheduleAtFixedRate(() -> updateStatus(river.getCode()), 10, 60, TimeUnit.SECONDS);
+		}
+	}
+
+	private void updateStatus(Long riverId) {
+		String message = collectRiverStatus(riverId);
+		if (message != null) {
+			River river = River.fromCode(riverId);
+			List<Alert> subcriptions = alertRepo.findAllByRiver(river);
+			for (Alert alert : subcriptions) {
+				try {
+					sendMessage(buildSendMessage(alert.userId.toString(), getMainMenuKeyboard(defaultLanguage), message));
+				} catch (TelegramApiException e) {
+					BotLogger.error(LOGTAG, e);
+				}
+			}
+		}else{
+			BotLogger.debug(LOGTAG, "Sem alertas para rio: " + River.fromCode(riverId));
+		}
+	}
+
+	private String collectRiverStatus(Long riverId) {
+
+		String uriString = "https://enchentes.infoamazonia.org:8080/station/" + riverId + "/alert";
+
+		try {
+			URI uri = new URI(uriString);
+			JSONTokener tokener = new JSONTokener(uri.toURL().openStream());
+			JSONObject root = new JSONObject(tokener);
+
+			AlertMessage alertMessage = new AlertMessage(riverId, root.getLong("timestamp"), root.getString("message"));
+			if (!alerts.containsKey(riverId) || alerts.get(riverId).timestamp < alertMessage.timestamp) {
+				alerts.put(riverId, alertMessage);
+				return alertMessage.message;
+			}
+		} catch (URISyntaxException | JSONException | IOException e) {
+			BotLogger.error(LOGTAG, e);
+		}
+		return null;
+	}
+
 }

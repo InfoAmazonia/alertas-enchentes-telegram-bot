@@ -14,12 +14,12 @@ public class Alert {
     @GeneratedValue(strategy=GenerationType.AUTO)
     private Long id;
     
-    public Integer userId;
+    public Long userId;
     public River river;
 
     protected Alert() {}
     
-    public Alert(Integer userId, River river) {
+    public Alert(Long userId, River river) {
 		this.userId = userId;
 		this.river = river;
 	}
