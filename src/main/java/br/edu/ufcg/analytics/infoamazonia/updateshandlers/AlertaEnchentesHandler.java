@@ -284,8 +284,8 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
                 }
                 
                 setConversationState(userId, message.getChatId(), State.ALERT);
-                createNewAlert(message.getChatId(), river);
-                return buildSendMessage(message, getAlertsKeyboard(language), getChooseNewAlertSetMessage(message.getText(), language));
+                boolean alertCreated = createNewAlert(message.getChatId(), river);
+               	return buildSendMessage(message, getAlertsKeyboard(language), getChooseNewAlertSetMessage(message.getText(), language, alertCreated));
             } 
         }
         setConversationState(message.getFrom().getId(), message.getChatId(), State.ALERT);
@@ -427,8 +427,12 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 		return conversation == null? State.START: conversation.state;
 	}
 
-    private void createNewAlert(Long chatID, River river) {
+    private boolean createNewAlert(Long chatID, River river) {
+    	if(alertRepo.findFirstByChatIdAndRiver(chatID, river) != null){
+    		return false;
+    	}
 		alertRepo.save(new Alert(chatID, river));
+		return true;
 	}
 
     private void updateAlertDemo(int userId, River river, Long timestamp) {

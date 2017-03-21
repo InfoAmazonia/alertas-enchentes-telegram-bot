@@ -39,8 +39,8 @@ public class CustomMessages {
         return alertListMessage;
     }
 
-    public static String getChooseNewAlertSetMessage(String city, String language) {
-        String baseString = LocalisationService.getInstance().getString("newAlertSaved", language);
+    public static String getChooseNewAlertSetMessage(String city, String language, boolean alertCreated) {
+        String baseString = LocalisationService.getInstance().getString(alertCreated?"newAlertSaved":"newAlertNotSaved", language);
         return String.format(baseString, Emoji.THUMBS_UP_SIGN.toString(), city);
     }
 
