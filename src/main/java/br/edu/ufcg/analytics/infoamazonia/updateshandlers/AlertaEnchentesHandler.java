@@ -244,7 +244,7 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 			} else if (message.getText().equals(getDeleteCommand(language))) {
 
 				String text = null;
-		        ReplyKeyboard replyKeyboard = getAlertsListKeyboard(message.getFrom().getId(), language);
+		        ReplyKeyboard replyKeyboard = getAlertsListKeyboard(message.getChatId(), language);
 		        if (replyKeyboard != null) {
 		            text = LocalisationService.getInstance().getString("chooseDeleteAlertCity", language);
 		            setConversationState(message.getFrom().getId(), message.getChatId(), State.ALERT_DELETE);
@@ -255,7 +255,7 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 
 				return buildSendMessage(message, replyKeyboard, text);
 			} else if (message.getText().equals(getListCommand(language))) {
-				List<String> alertNames = getAlertNamesByUser(message.getFrom().getId());
+				List<String> alertNames = getAlertNamesByUser(message.getChatId());
 				return buildSendMessage(message, getAlertsKeyboard(language), getAlertListMessage(alertNames, language));
 			} else if (message.getText().equals(getDemoCommand(language))) {
 				String text = LocalisationService.getInstance().getString("chooseNewAlertCityForDemo", language);
@@ -331,13 +331,13 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
             }
             
             River river = River.fromName(message.getText());
-            if(river != null && deleteAlert(message.getFrom().getId(), river)){
+            if(river != null && deleteAlert(message.getChatId(), river)){
             	setConversationState(message.getFrom().getId(), message.getChatId(), State.ALERT);
             	return buildSendMessage(message, getAlertsKeyboard(language), LocalisationService.getInstance().getString("alertDeleted", language));
             }
         }
 
-        return buildSendMessage(message, getAlertsListKeyboard(message.getFrom().getId(), language), LocalisationService.getInstance().getString("chooseOption", language));
+        return buildSendMessage(message, getAlertsListKeyboard(message.getChatId(), language), LocalisationService.getInstance().getString("chooseOption", language));
     }
 
 
@@ -394,9 +394,9 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 		return buildKeyboard(keyboard);
 	}
 
-	private ReplyKeyboardMarkup getAlertsListKeyboard(Integer userId, String language) {
+	private ReplyKeyboardMarkup getAlertsListKeyboard(Long chatId, String language) {
 
-		List<String> alertNames = getAlertNamesByUser(userId);
+		List<String> alertNames = getAlertNamesByUser(chatId);
 
 		if(alertNames.isEmpty()){
 			return null;
@@ -466,8 +466,8 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 		return "Opção indisponível no momento. Tente novamente em alguns minutos!";
 	}
 
-	public boolean deleteAlert(Integer userId, River river) {
-		Alert alert = alertRepo.findFirstByUserIdAndRiver(userId, river);
+	public boolean deleteAlert(Long chatId, River river) {
+		Alert alert = alertRepo.findFirstByChatIdAndRiver(chatId, river);
 		if(alert == null){
 			return false;
 		}
@@ -475,8 +475,8 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 		return true;
 	}
 	
-	public List<String> getAlertNamesByUser(Integer userId) {
-		return alertRepo.findAllByUserId(userId).stream().map(alert -> alert.river.getName()).collect(Collectors.toList());
+	public List<String> getAlertNamesByUser(Long chatId) {
+		return alertRepo.findAllByChatId(chatId).stream().map(alert -> alert.river.getName()).collect(Collectors.toList());
 	}
 
 	private String getRiverStatusMessage(Long riverId, String language) {
@@ -511,7 +511,7 @@ public class AlertaEnchentesHandler extends TelegramLongPollingBot {
 			List<Alert> subcriptions = alertRepo.findAllByRiver(river);
 			for (Alert alert : subcriptions) {
 				try {
-					sendMessage(buildSendMessage(alert.userId.toString(), getMainMenuKeyboard(defaultLanguage), message));
+					sendMessage(buildSendMessage(alert.chatId.toString(), getMainMenuKeyboard(defaultLanguage), message));
 				} catch (TelegramApiException e) {
 					BotLogger.error(LOGTAG, e);
 				}

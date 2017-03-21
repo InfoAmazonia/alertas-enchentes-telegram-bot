@@ -14,19 +14,19 @@ public class Alert {
     @GeneratedValue(strategy=GenerationType.AUTO)
     private Long id;
     
-    public Long userId;
+    public Long chatId;
     public River river;
 
     protected Alert() {}
     
-    public Alert(Long userId, River river) {
-		this.userId = userId;
+    public Alert(Long chatId, River river) {
+		this.chatId = chatId;
 		this.river = river;
 	}
 
     @Override
 	public String toString() {
-		return "Alert [userId=" + userId + ", river=" + river + "]";
+		return "Alert [chatId=" + chatId + ", river=" + river + "]";
 	}
 
 }

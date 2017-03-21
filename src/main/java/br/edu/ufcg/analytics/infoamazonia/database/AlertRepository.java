@@ -9,9 +9,9 @@ import br.edu.ufcg.analytics.infoamazonia.model.Alert;
 
 public interface AlertRepository extends CrudRepository<Alert, Long> {
 
-    Alert findFirstByUserIdAndRiver(Integer userId, River river);
+    Alert findFirstByChatIdAndRiver(Long chatId, River river);
 
     List<Alert> findAllByRiver(River river);
 
-    List<Alert> findAllByUserId(Integer userId);
+    List<Alert> findAllByChatId(Long chatId);
 }
